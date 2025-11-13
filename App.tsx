@@ -7,6 +7,8 @@ import { ImageDropzone } from './components/ImageDropzone';
 import { ImagePreview } from './components/ImagePreview';
 import { Spinner } from './components/Spinner';
 
+type OutputFormat = 'png' | 'jpeg' | 'webp';
+
 const App: React.FC = () => {
   const [originalImageFile, setOriginalImageFile] = useState<File | null>(null);
   const [originalImagePreview, setOriginalImagePreview] = useState<string | null>(null);
@@ -16,6 +18,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [width, setWidth] = useState<string>('');
   const [height, setHeight] = useState<string>('');
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>('png');
 
   const handleImageChange = useCallback(async (file: File) => {
     if (file && file.type.startsWith('image/')) {
@@ -64,8 +67,10 @@ const App: React.FC = () => {
       !isNaN(numericHeight) &&
       numericHeight > 0
     ) {
-      finalPrompt += `\n\nIMPORTANT: The final image must be resized to exactly ${numericWidth} pixels wide by ${numericHeight} pixels high.`;
+      finalPrompt += `\n\n- The final image must be resized to exactly ${numericWidth} pixels wide by ${numericHeight} pixels high.`;
     }
+    
+    finalPrompt += `\n- The final image output format must be ${outputFormat.toUpperCase()}.`;
 
     try {
       const base64Data = (originalImagePreview as string).split(',')[1];
@@ -76,7 +81,7 @@ const App: React.FC = () => {
         mimeType,
         finalPrompt
       );
-      setGeneratedImage(`data:image/png;base64,${resultBase64}`);
+      setGeneratedImage(`data:image/${outputFormat};base64,${resultBase64}`);
     } catch (err) {
       setError(
         err instanceof Error
@@ -86,6 +91,16 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const handleDownloadImage = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.href = generatedImage;
+    link.download = `edited-image-${Date.now()}.${outputFormat}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleClear = () => {
@@ -97,6 +112,7 @@ const App: React.FC = () => {
     setHeight('');
     setError(null);
     setIsLoading(false);
+    setOutputFormat('png');
   };
 
   return (
@@ -173,6 +189,29 @@ const App: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                <h2 className="text-2xl font-bold text-cyan-400">
+                  4. Select Output Format
+                </h2>
+                <div>
+                  <label
+                    htmlFor="format"
+                    className="block text-sm font-medium text-gray-400 mb-1"
+                  >
+                    Format
+                  </label>
+                  <select
+                    id="format"
+                    value={outputFormat}
+                    onChange={(e) => setOutputFormat(e.target.value as OutputFormat)}
+                    className="w-full p-2 bg-gray-800 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors duration-200"
+                    disabled={isLoading}
+                  >
+                    <option value="png">PNG</option>
+                    <option value="jpeg">JPEG</option>
+                    <option value="webp">WEBP</option>
+                  </select>
+                </div>
               </>
             )}
           </div>
@@ -201,7 +240,7 @@ const App: React.FC = () => {
             )}
 
             {generatedImage && !isLoading && (
-              <ImagePreview label="Edited" src={generatedImage} />
+              <ImagePreview label="Edited" src={generatedImage} onDownload={handleDownloadImage} />
             )}
           </div>
         </div>
